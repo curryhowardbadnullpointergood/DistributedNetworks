@@ -1,0 +1,115 @@
+
+
+	1 contoller class 
+	1 DStore class (multiple instances of this class can exist?)
+
+
+	both support concurrency, so import required concurent libs 
+	multiple clients send requests (store, load, list, remove) 
+
+
+	Each file is replicated R times over DIFFERENT DStores, 
+
+	Well this poses a few problems 
+	1. which DStores do you choose, is it based on the last
+	couple used, or terms of size, so probably have to 
+	implement a algorithm for this?? maybe??? 
+
+	2. So I suppose, this can be slved with a hashmap and 
+	making sure the number of files is the same 
+
+	Files are stored by the DStores, Controller controls all 
+	the requests, and should maintain an index with the allocation
+	of files to DStores and size in bytes of each stored file? what
+
+	Ah so index here is a datatype, and it should contain, a dstore1, 
+	(file,bytes) tuple pair. 
+
+	Client get's files from DStores, so I assume Controller passes in the 
+	port of the DStore, so ports should also be stored in index for the sake 
+	of convinience, or maybe use map but then this requires 2 concurrent 
+	datastructures which is worse than 1. 
+
+	Filenames do not contain spaces.
+
+
+
+	Controller is started first, with R as an argument. 
+	Contoller waits for DStores to join, and does not 
+	proceed until atleast R DStores have joined the system. 
+
+
+
+	1. is this a continuous logical check? If so that's kind 
+	of messed up. In multiple ways. 
+
+
+	New DStores can join at runtime, not good. 
+	Still required to make sure files are evenly distributed, this 
+	is an absolute shitshow. 
+
+	1. So when new DStores join, then what happens to the files stores 
+	in them previously, what the actial fuck. 
+
+
+	Controller, Dstores and Clients will communicate through TCP. 
+
+
+	There should only be 1 connection between the DStore and 
+	the Controller. 
+
+	If one of the DStore connection drops then this must be removed from the 
+	index. This poses quite a lot of issues. 
+
+
+
+	Messages, to communiate should be sent with the printwriter clas, 
+	println, and read using buffered reader and readLine() method, 
+
+
+	For data, processes should send using the write() method of OutputStream 
+	class and receive using the readNBytes() method of InputStream class.
+
+
+	Index should have a dedicated field to record its current state. 
+	What should be the states? 
+
+	States:
+	"store in progress" no Load or Remove operations on this file 
+	however if another file with the same name of F is trying to be
+	stored, reply should be ERROR ALREADY_EXISTS message. 
+
+
+	"store complete" 
+	"remove in progress"
+	"remove complete" - remove from index 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
