@@ -84,6 +84,52 @@
 	"remove in progress"
 	"remove complete" - remove from index 
 
+	Finally changed to java 21, don't understand why these idiots don't use 22 FFS. 
+
+
+	Each Dstore should use a different path and port
+
+	Dstores must empty their file folder at start up
+
+
+	timeout should be used when a process expects a response from another 
+	process; for example, when the Controller waits for a Dstore to send 
+	a STORE_ACK message. 
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
