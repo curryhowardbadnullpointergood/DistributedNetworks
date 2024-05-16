@@ -1,38 +1,38 @@
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Controller {
 
 
 
-    // takes in a port, replication factor, a timeout, the last two I'm sure can be thought of as ints
-    // port is int as well I believe
-    public Controller (Integer cport, Integer replication_factor, Integer timeout_val){
+    // need to change these names, and perhaps data structure and order
+    Index index;
+    Map<Integer, Socket> dataStoreSocketList;
+    Map<String, ArrayList<Integer>> fileList;
+    Map<String, PrintWriter> fileStorePrintWriter;
+    Map<String, PrintWriter> fileRemovePrintWriter;
+
+    int rebalanceCounter;
+    int rebalanceCompleteCounter;
+    int replicationFactor;
+    int completedStores;
+    int loadPortCounter;
+
+
+    int controllerPort;
+    int timeoutVal;
+    int rebalancePeriod;
 
 
 
+    public Controller (Integer cport, Integer replication_factor, Integer timeout_val, Integer rebalancePeriod){
 
-    }
+        // names need to be changed
 
-    static Index index;
-    static Map<Integer, Socket> dataStoreSocketList;
-    static Map<String, ArrayList<Integer>> fileList;
-    static Map<String, PrintWriter> fileStorePrintWriter;
-    static Map<String, PrintWriter> fileRemovePrintWriter;
-
-    static int rebalanceCounter;
-    static int rebalanceCompleteCounter;
-    static int replicationFactor;
-    static int completedStores;
-    static int loadPortCounter;
-
-
-
-    private static void init() {
         index = new Index(new ArrayList<>(), new ConcurrentHashMap<>());
         fileList = new ConcurrentHashMap<>();
         dataStoreSocketList = new ConcurrentHashMap<>();
@@ -41,66 +41,52 @@ public class Controller {
 
         rebalanceCounter = 0;
         rebalanceCompleteCounter = 0;
-        replicationFactor = 0;
+        replicationFactor = replication_factor;
+        controllerPort = cport;
+        timeoutVal = timeout_val;
+        rebalancePeriod = rebalancePeriod;
         completedStores = 0;
         loadPortCounter = 0;
-    }
-
-    public static void main(String[] args) {
-
-        Controller controller = new Controller();
-
-        final int controllerPort;
-        final int replicationFactor;
-        int timeout;
-        int rebalancePeriod;
 
 
-        init();
-
-
-
-
-        try {
-            controllerPort = Integer.parseInt(args[0]);
-            replicationFactor = Integer.parseInt(args[1]);
-            timeout = Integer.parseInt(args[2]);
-            rebalancePeriod = Integer.parseInt(args[3]);
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input format. Please provide integer values for arguments.");
-            return;
-        } catch (ArrayIndexOutOfBoundsException e) {
-            System.out.println("Invalid number of arguments. Please provide 4 integer values for arguments.");
-            return;
-        }
-
-
-        setReplicationFactor(replicationFactor);
+        // bunch of setter, can be removed , check each function and make sure it is half legit
         index.reset();
-
 
         ExecutorService pool = Executors.newFixedThreadPool(10);
 
+        startRebalanceTimer(rebalancePeriod * 1000);
 
-        controller.startRebalanceTimer(rebalancePeriod * 1000);
 
         try {
             var serverSocket = new ServerSocket(controllerPort);
-            logger.log("Controller setup on port " + controllerPort);
+            System.out.println("Controller setup on port " + controllerPort);
 
 
             while (true) {
                 try {
 
                     Socket client = serverSocket.accept();
-                    pool.submit(() -> controller.handleClient(client, timeout));
+                    pool.submit(() -> handleClient(client, timeoutVal));
                 } catch (Exception e) {
-                    logger.log("Error handling client connection: " + e.getMessage());
+                    System.out.println("Error handling client connection: " + e.getMessage());
                 }
             }
         } catch (Exception e) {
-            logger.log("Error starting server socket: " + e.getMessage());
+            System.out.println("Error starting server socket: " + e.getMessage());
         }
+
+    }
+
+    public static void main(String[] args) {
+
+
+        if (args.length >= 4){
+
+            Controller controller = new Controller(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]), Integer.parseInt(args[3]));
+
+        } System.out.println("Insufficient number of arguments");
+
+
     }
 
     private void handleClient(Socket client, int timeout) {
@@ -116,7 +102,7 @@ public class Controller {
             while ((line = in.readLine()) != null) {
                 String[] contents = line.split(" ");
                 String command = contents[0];
-                logger.messageReceived(client, line);
+                System.out.println("Message Received" + line);
 
                 switch (command) {
                     case Protocol.JOIN_TOKEN -> {
@@ -140,7 +126,7 @@ public class Controller {
                             handleStore(client, out, contents, storeLatch);
                             boolean storeAckReceived = storeLatch.await(timeout, TimeUnit.MILLISECONDS);
                             if (!storeAckReceived) {
-                                logger.log("STORE_ACK not received within timeout");
+                                System.out.println("STORE_ACK not received within timeout");
                             }
                         }
                     }
@@ -157,7 +143,7 @@ public class Controller {
                             handleRemove(client, out, contents, removeLatch);
                             boolean storeAckReceived = removeLatch.await(timeout, TimeUnit.MILLISECONDS);
                             if (!storeAckReceived) {
-                                logger.log("REMOVE_ACK not received within timeout");
+                                System.out.println("REMOVE_ACK not received within timeout");
                             }
                         }
                     }
@@ -167,11 +153,11 @@ public class Controller {
                         }
                     }
                     case Protocol.REBALANCE_COMPLETE_TOKEN -> handleRebalanceComplete(client, out);
-                    default -> logger.log("Unidentified message: " + line);
+                    default -> System.out.println("Unidentified message: " + line);
                 }
             }
         } catch (SocketException e) {
-            logger.log("SocketException occurred. Failed Data Store will be fixed: " + e.getMessage());
+            System.out.println("SocketException occurred. Failed Data Store will be fixed: " + e.getMessage());
             fixFailedDataStore(currentDataStorePort);
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -184,7 +170,7 @@ public class Controller {
 
     private void handleRebalanceComplete(Socket client, PrintWriter out) {
         out.println(Protocol.LIST_TOKEN);
-        logger.messageSent(client, Protocol.LIST_TOKEN);
+        System.out.println( Protocol.LIST_TOKEN);
 
         setRebalanceCompleteCounter(getRebalanceCompleteCounter() - 1);
         if (getRebalanceCompleteCounter() == 0) {
@@ -193,7 +179,7 @@ public class Controller {
     }
 
     private void handleRemoveAck(Socket client, int currentPort, String[] contents) {
-        if (index.fileStatus.get(contents[1]) == Index.STATUS_REMOVING) {
+        if (index.fileStatus.get(contents[1]) == index.Removing) {
             removeComplete(client, currentPort, fileRemovePrintWriter.get(contents[1]), contents[1]);
         }
     }
@@ -206,7 +192,7 @@ public class Controller {
             remove(client, out, contents[1]);
             removeLatch.countDown();
         } catch (Exception e) {
-            logger.log("Remove handling failed");
+            System.out.println("Remove handling failed");
         }
     }
 
@@ -225,12 +211,12 @@ public class Controller {
             load(out, contents[1], getLoadPortCounter());
         } else {
             out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-            logger.messageSent(client, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+            System.out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
         }
     }
 
     private void handleStoreAck(Socket client, int currentPort, String[] contents) {
-        if (index.fileStatus.get(contents[1]) == Index.STATUS_STORING) {
+        if (index.fileStatus.get(contents[1]) == index.Storing) {
             storeComplete(client, currentPort, fileStorePrintWriter.get(contents[1]), getCompletedStores() + 1, contents[1]);
         }
     }
@@ -257,9 +243,9 @@ public class Controller {
         setCompletedStores(0);
 
 
-        index.fileStatus.put(fileName, Index.STATUS_STORED);
+        index.fileStatus.put(fileName, index.Stored);
         printWriter.println(Protocol.STORE_COMPLETE_TOKEN);
-        logger.messageSent(client, Protocol.STORE_COMPLETE_TOKEN);
+        System.out.println(Protocol.STORE_COMPLETE_TOKEN);
     }
 
     private void handleStore(Socket client, PrintWriter out, String[] contents, CountDownLatch storeLatch) {
@@ -270,13 +256,13 @@ public class Controller {
             store(client, out, replicationFactor, contents[1], Integer.parseInt(contents[2]));
             storeLatch.countDown();
         } catch (Exception e) {
-            logger.log("Store handling failed");
+            System.out.println("Store handling failed");
         }
     }
 
     private void handleDataStoreList(int port, String[] contents) {
         rebalanceCounter++;
-        logger.log("Data Store LIST");
+        System.out.println("Data Store LIST");
         ArrayList<String> fileNames = new ArrayList<>(Arrays.asList(contents).subList(1, contents.length));
         updateHashMap(port, fileNames);
     }
@@ -302,26 +288,26 @@ public class Controller {
             return true;
         }
         printWriter.println(Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
-        logger.messageSent(client, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+        System.out.println(Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
         return false;
     }
 
     private synchronized void addDataStore(Socket dataStore, Integer port) throws IOException {
         //System.out.println(dataStore);
         dataStoreSocketList.put(port, new Socket(InetAddress.getLoopbackAddress(), port));
-        logger.dstoreJoined(dataStore, port.toString());
+        System.out.println(port.toString());
     }
 
     private synchronized void listFiles(Socket client, PrintWriter printWriter) {
         StringBuilder fileNames = new StringBuilder();
         if (index.getFileNames().size() > 0) {
             for (String file : index.getFileNames()) {
-                if (index.fileStatus.get(file) == Index.STATUS_STORED)
+                if (index.fileStatus.get(file) == index.Stored)
                     fileNames.append(" ").append(file);
             }
         }
         printWriter.println(Protocol.LIST_TOKEN + fileNames);
-        logger.messageSent(client, Protocol.LIST_TOKEN + fileNames);
+        System.out.println(Protocol.LIST_TOKEN + fileNames);
     }
 
     private synchronized void store(Socket clientSocket, PrintWriter printWriter, int replicationFactor, String fileName, int fileSize) {
@@ -331,7 +317,7 @@ public class Controller {
             ArrayList<Integer> tmp = new ArrayList<>();
             tmp.add(fileSize);
             fileList.put(fileName, tmp);
-            index.fileStatus.put(fileName, Index.STATUS_STORING);
+            index.fileStatus.put(fileName, index.Storing);
 
 
             StringBuilder portsBuilder = new StringBuilder();
@@ -346,15 +332,15 @@ public class Controller {
 
 
             printWriter.println(Protocol.STORE_TO_TOKEN + ports);
-            logger.messageSent(clientSocket, Protocol.STORE_TO_TOKEN + ports);
+            System.out.println(Protocol.STORE_TO_TOKEN + ports);
         } else {
-            if (index.fileStatus.get(fileName) == Index.STATUS_REMOVED) {
+            if (index.fileStatus.get(fileName) == index.Removed) {
                 printWriter.println(Protocol.STORE_TO_TOKEN);
-                logger.messageSent(clientSocket, Protocol.STORE_TO_TOKEN);
+                System.out.println(Protocol.STORE_TO_TOKEN);
             }
 
             printWriter.println(Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
-            logger.messageSent(clientSocket, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
+            System.out.println(Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
         }
     }
 
@@ -366,7 +352,7 @@ public class Controller {
                 int port = fileList.get(fileName).get(loadPortCounter);
 
                 printWriter.println(Protocol.LOAD_FROM_TOKEN + " " + port + " " + fileSize);
-                logger.log("Loading from " + port + " with size " + fileSize);
+                System.out.println("Loading from " + port + " with size " + fileSize);
             }
         }
     }
@@ -375,14 +361,14 @@ public class Controller {
 
         if (!index.fileNames.contains(fileName)) {
             printWriter.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-            logger.messageSent(client, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+            System.out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
             return;
         }
 
 
         index.fileStatus.remove(fileName);
-        index.fileStatus.put(fileName, Index.STATUS_REMOVING);
-        logger.log("Remove in progress");
+        index.fileStatus.put(fileName, index.Removing);
+        System.out.println("Remove in progress");
 
 
         if (fileList.containsKey(fileName)) {
@@ -399,14 +385,14 @@ public class Controller {
             PrintWriter dataStorePrintWriter = new PrintWriter(dataStore.getOutputStream(), true);
 
             dataStorePrintWriter.println(Protocol.REMOVE_TOKEN + " " + fileName);
-            logger.messageSent(dataStore, Protocol.REMOVE_TOKEN + " " + fileName);
+            System.out.println(Protocol.REMOVE_TOKEN + " " + fileName);
         } catch (IOException e) {
-            logger.log("Failed to send remove request to port " + port + ": " + e.getMessage());
+            System.out.println("Failed to send remove request to port " + port + ": " + e.getMessage());
         }
     }
 
     private synchronized void removeComplete(Socket client, Integer port, PrintWriter printWriter, String fileName) {
-        logger.log(String.valueOf(fileList.get(fileName).size() - 1));
+        System.out.println(String.valueOf(fileList.get(fileName).size() - 1));
 
 
         if (fileList.get(fileName).size() - 1 > 1) {
@@ -422,11 +408,11 @@ public class Controller {
 
 
         index.fileStatus.remove(fileName);
-        index.fileStatus.put(fileName, Index.STATUS_REMOVED);
+        index.fileStatus.put(fileName, index.Removed);
 
 
         printWriter.println(Protocol.REMOVE_COMPLETE_TOKEN);
-        logger.messageSent(client, Protocol.REMOVE_COMPLETE_TOKEN);
+        System.out.println(Protocol.REMOVE_COMPLETE_TOKEN);
     }
 
     private synchronized void startRebalanceTimer(int rebalanceTime) {
@@ -571,7 +557,7 @@ public class Controller {
     private synchronized HashMap<Integer, ArrayList<String>> removeFiles(ConcurrentHashMap<String, Integer> statusHashMap) {
         HashMap<Integer, ArrayList<String>> filesToRemove = new HashMap<>();
         for (String key : statusHashMap.keySet()) {
-            if (statusHashMap.get(key) == Index.STATUS_REMOVING) {
+            if (statusHashMap.get(key) == index.Removing) {
                 ArrayList<Integer> ports = fileList.get(key);
                 ports.remove(0);
                 for (Integer port : ports) {
@@ -582,9 +568,9 @@ public class Controller {
         return filesToRemove;
     }
 
-    private synchronized static HashMap<Integer, ArrayList<String>> getDataStoreHashMap() {
+    private synchronized HashMap<Integer, ArrayList<String>> getDataStoreHashMap() {
         for (String key : index.fileNames) {
-            if (index.fileStatus.get(key) == Index.STATUS_REMOVED) {
+            if (index.fileStatus.get(key) == index.Removed) {
                 fileList.remove(key);
             }
         }
@@ -780,7 +766,7 @@ public class Controller {
 
             filesToRemove.append(removeList == null ? "0" : (removeList.size() + " " + String.join(" ", removeList)));
 
-            /
+
 
             sendRebalanceRequest(port, filesToSend.toString(), filesToRemove.toString());
         }
@@ -792,7 +778,7 @@ public class Controller {
                 .collect(Collectors.joining(" "));
     }
 
-    /
+
 
     private void sendRebalanceRequest(Integer port, String filesToSend, String filesToRemove) {
         try {
@@ -800,26 +786,26 @@ public class Controller {
             var dataStorePrintWriter = new PrintWriter(dataStore.getOutputStream(), true);
 
             dataStorePrintWriter.println(Protocol.REBALANCE_TOKEN + " " + filesToSend + " " + filesToRemove);
-            logger.messageSent(dataStore, Protocol.REBALANCE_TOKEN + " " + filesToSend + " " + filesToRemove);
+            System.out.println(Protocol.REBALANCE_TOKEN + " " + filesToSend + " " + filesToRemove);
 
 
 
             setRebalanceCompleteCounter(getRebalanceCompleteCounter() + 1);
         } catch (IOException e) {
-            logger.log("Failed to send rebalance request: " + e.getMessage());
+            System.out.print("Failed to send rebalance request: " + e.getMessage());
         }
     }
 
     private synchronized void updateIndexAfterRebalance() {
         for (String key : index.fileStatus.keySet()) {
-            if (index.fileStatus.get(key) == Index.STATUS_REMOVING) {
+            if (index.fileStatus.get(key) == index.Removing) {
                 index.fileStatus.remove(key);
                 index.fileNames.remove(key);
             }
         }
     }
 
-    private static synchronized void fixFailedDataStore(Integer port) {
+    private synchronized void fixFailedDataStore(Integer port) {
         if (port == 0)
             return;
 
@@ -843,35 +829,33 @@ public class Controller {
                 });
     }
 
-    public static int getReplicationFactor() {
+    public int getReplicationFactor() {
         return replicationFactor;
     }
 
-    public static void setReplicationFactor(int replicationFactor) {
-        Controller.replicationFactor = replicationFactor;
-    }
 
-    public static int getCompletedStores() {
+
+    public int getCompletedStores() {
         return completedStores;
     }
 
-    public static void setCompletedStores(int completedStores) {
-        Controller.completedStores = completedStores;
+    public void setCompletedStores(int cs) {
+        completedStores = cs;
     }
 
-    public static int getLoadPortCounter() {
+    public int getLoadPortCounter() {
         return loadPortCounter;
     }
 
-    public static void setLoadPortCounter(int loadPortCounter) {
-        Controller.loadPortCounter = loadPortCounter;
+    public void setLoadPortCounter(int lpc) {
+        loadPortCounter = lpc;
     }
 
-    public static int getRebalanceCompleteCounter() {
+    public int getRebalanceCompleteCounter() {
         return rebalanceCompleteCounter;
     }
 
-    public static void setRebalanceCompleteCounter(int rebalanceCompleteCounter) {
-        Controller.rebalanceCompleteCounter = rebalanceCompleteCounter;
+    public void setRebalanceCompleteCounter(int re) {
+        rebalanceCompleteCounter = re;
     }
 }
