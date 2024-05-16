@@ -71,7 +71,7 @@
 	class and receive using the readNBytes() method of InputStream class.
 
 
-	Index should have a dedicated field to record its current state. 
+	IndexOld should have a dedicated field to record its current state.
 	What should be the states? 
 
 	States:

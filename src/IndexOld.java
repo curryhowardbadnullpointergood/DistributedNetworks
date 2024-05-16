@@ -1,11 +1,8 @@
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
+public class IndexOld {
 
-
-
-
-public class Index {
 
     public int Stored = 235;
     public int Removed = 542;
@@ -18,8 +15,8 @@ public class Index {
 
 
 
-    // , ConcurrentHashMap<String,Integer> fileSize
-    public Index(ArrayList<String> fileNames, ConcurrentHashMap<String, Integer> fileStatus) {
+// , ConcurrentHashMap<String,Integer> fileSize
+    public IndexOld(ArrayList<String> fileNames, ConcurrentHashMap<String, Integer> fileStatus) {
         this.fileNames = fileNames;
         this.fileStatus = fileStatus;
         //this.fileSizes = fileSize;
@@ -43,5 +40,5 @@ public class Index {
         this.fileStatus.clear();
         // this.fileSizes.clear();
     }
-
 }
+

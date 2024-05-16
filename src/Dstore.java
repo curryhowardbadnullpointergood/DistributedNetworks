@@ -7,7 +7,6 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 import java.net.InetAddress;
 import java.net.ServerSocket;
-import java.util.stream.Stream;
 import java.nio.file.DirectoryStream;
 
 public class Dstore {
@@ -43,7 +42,7 @@ public class Dstore {
         try (ServerSocket serverSocket = new ServerSocket(port);
              Socket controller = new Socket(InetAddress.getLoopbackAddress(), controllerPort);
              PrintWriter pw = new PrintWriter(controller.getOutputStream(), true);) {
-
+            new Thread(() -> handleClient(controller, pw)).start();
 
             System.out.println("Data Store setup on port " + port);
             pw.println(String.format("%s %d", Protocol.JOIN_TOKEN, port));
@@ -94,12 +93,13 @@ public class Dstore {
                         }
                         case Protocol.REMOVE_TOKEN -> deleteFile(client, contents[1], pw);
                         case Protocol.REBALANCE_TOKEN -> {
-                            // Extract remaining rebalance from command
+
+
                             var remainingRebalance = line.split(" ", 2)[1];
                             rebalance(client, pw, remainingRebalance);
                         }
                         case Protocol.REBALANCE_STORE_TOKEN -> {
-                            var port = Integer.parseInt(contents[2]);
+
                             storeRequest(client, printWriter);
                             receiveContent(client, printWriter, client.getInputStream() , false);
                         }

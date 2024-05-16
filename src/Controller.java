@@ -9,12 +9,12 @@ public class Controller {
 
 
 
-    // need to change these names, and perhaps data structure and order
+
     Index index;
     Map<Integer, Socket> dataStoreSocketList;
-    Map<String, ArrayList<Integer>> fileList;
-    Map<String, PrintWriter> fileStorePrintWriter;
-    Map<String, PrintWriter> fileRemovePrintWriter;
+    static ConcurrentHashMap<String, ArrayList<Integer>> fileList;
+    ConcurrentHashMap<String, PrintWriter> fileStorePrintWriter;
+    ConcurrentHashMap<String, PrintWriter> fileRemovePrintWriter;
 
     int rebalanceCounter;
     int rebalanceCompleteCounter;
@@ -29,9 +29,9 @@ public class Controller {
 
 
 
-    public Controller (Integer cport, Integer replication_factor, Integer timeout_val, Integer rebalancePeriod){
+    public Controller (Integer cport, Integer replication_factor, Integer timeout_val, Integer rebalance_Period){
 
-        // names need to be changed
+
 
         index = new Index(new ArrayList<>(), new ConcurrentHashMap<>());
         fileList = new ConcurrentHashMap<>();
@@ -44,7 +44,7 @@ public class Controller {
         replicationFactor = replication_factor;
         controllerPort = cport;
         timeoutVal = timeout_val;
-        rebalancePeriod = rebalancePeriod;
+        rebalancePeriod = rebalance_Period;
         completedStores = 0;
         loadPortCounter = 0;
 
