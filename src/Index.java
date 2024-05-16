@@ -11,10 +11,15 @@ public class Index {
 
     ArrayList<String> fileNames;
     ConcurrentHashMap<String, Integer> fileStatus;
+    //ConcurrentHashMap<String, Integer> fileSizes;
 
+
+
+// , ConcurrentHashMap<String,Integer> fileSize
     public Index(ArrayList<String> fileNames, ConcurrentHashMap<String, Integer> fileStatus) {
         this.fileNames = fileNames;
         this.fileStatus = fileStatus;
+        //this.fileSizes = fileSize;
     }
 
     public ArrayList<String> getFileNames() {
@@ -25,10 +30,15 @@ public class Index {
         return fileStatus;
     }
 
+//    public ConcurrentHashMap<String, Integer> getFileSizes() {
+//        return fileSizes;
+//    }
+
 
     public void reset() {
         this.fileNames.clear();
         this.fileStatus.clear();
+        // this.fileSizes.clear();
     }
 }
 
