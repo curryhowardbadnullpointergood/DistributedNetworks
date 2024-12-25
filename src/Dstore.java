@@ -91,7 +91,7 @@ public class Dstore {
                             client.setSoTimeout(timeduration);
                             loadFile(contents[1], dataStoreOutput);
                         }
-                        case Protocol.REMOVE_TOKEN -> deleteFile(client, contents[1], pw);
+                        case Protocol.REMOVE_TOKEN -> deleteF2(contents[1], pw);
                         case Protocol.REBALANCE_TOKEN -> {
 
 
@@ -106,6 +106,9 @@ public class Dstore {
                         case Protocol.ACK_TOKEN -> sendContents(dataStoreOutput);
                         default -> System.out.println("Unidentified message: " + line + "\n Port: " + dport);
                     }
+                }
+                if((line = in.readLine()) == null){
+                    System.out.println(" ");
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -194,6 +197,32 @@ public class Dstore {
                     pw.println(Protocol.REMOVE_ACK_TOKEN + " " + fileName);
                     System.out.println("Port: " + dport + Protocol.REMOVE_ACK_TOKEN + " " + fileName);
                 }
+
+
+            } catch (Exception e) {
+                System.out.println("Failed to delete: " + fileName + " - " + e.getMessage());
+            }
+        } else {
+            pw.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+            System.out.println("Port: " + dport + Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+        }
+
+
+    }
+
+    private void deleteF2(String fileName, PrintWriter pw){
+        Path filePath = Path.of(fileDirectory, fileName);
+        // deletes file if it exists, else sends the appropriate error messages
+        if (Files.exists(filePath)) {
+
+            try {
+
+                Files.delete(filePath);
+
+
+                pw.println(Protocol.REMOVE_ACK_TOKEN + " " + fileName);
+                System.out.println("Port: " + dport + Protocol.REMOVE_ACK_TOKEN + " " + fileName);
+
 
 
             } catch (Exception e) {

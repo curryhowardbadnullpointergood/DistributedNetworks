@@ -153,7 +153,7 @@ public class Controller {
                         }
                     }
                     case Protocol.REBALANCE_COMPLETE_TOKEN -> handleRebalanceComplete(client, out);
-                    default -> System.out.println("Unidentified message: " + line);
+                    //default -> System.out.println("Unidentified message: " + line);
                 }
             }
         } catch (SocketException e) {
